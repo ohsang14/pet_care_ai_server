@@ -1,80 +1,42 @@
 package com.ohsang.petcareai.controller;
 
+import com.ohsang.petcareai.dto.AnalysisResponseDto;
+import com.ohsang.petcareai.service.AnalysisService; // 👈 1. RestTemplate 대신 Service를 import
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.*;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartFile; // 👈 2. MultipartFile import
+
+import java.util.List; // 👈 3. List import
 
 @RestController
 @RequestMapping("/api/analysis")
 @RequiredArgsConstructor
 public class AnalysisController {
 
-    private final RestTemplate restTemplate;
-
-    /**
-     * Python AI 서버 연결 테스트용 API
-     * GET /api/analysis/test
-     */
-    @GetMapping("/test")
-    public ResponseEntity<String> testAiServerConnection() {
-
-        String aiServerUrl = "http://localhost:5001/";
-        try {
-            String response = restTemplate.getForObject(aiServerUrl, String.class);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("AI 서버 연결에 실패했습니다: " + e.getMessage());
-        }
-    }
-
+    // 4. RestTemplate 대신 AnalysisService를 주입받음
+    private final AnalysisService analysisService;
 
     /**
      * 실제 품종 분석 요청 API
-     * Flutter 앱으로부터 이미지를 받아 Python 서버로 전달(포워딩)합니다.
-     * POST /api/analysis/breed
+     * 이제 Controller는 '안내 데스크' 역할만 하고,
+     * 모든 복잡한 처리는 'analysisService'가 담당합니다.
      */
-
-
     @PostMapping("/breed")
-    public ResponseEntity<String> analyzeBreed(
+    public ResponseEntity<List<AnalysisResponseDto>> analyzeBreed(
             @RequestParam("file") MultipartFile file) {
 
-        String aiServerUrl = "http://localhost:5001/analyze";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-
         try {
-            // Flutter에서 받은 파일을 Python 서버로 보낼 수 있게 재포장
-            ByteArrayResource fileAsResource = new ByteArrayResource(file.getBytes()) {
-                @Override
-                public String getFilename() {
-                    return file.getOriginalFilename();
-                }
-            };
-            body.add("file", fileAsResource);
+            // 5. '작업반장'에게 이미지 파일을 넘기고, '최종 완성본' DTO 리스트를 받음
+            List<AnalysisResponseDto> results = analysisService.analyzeImage(file);
 
-            // RestTemplate으로 Python 서버에 POST 요청 (파일 첨부)
-            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
-            ResponseEntity<String> response = restTemplate.postForEntity(
-                    aiServerUrl,
-                    requestEntity,
-                    String.class
-            );
-
-            // Python 서버의 응답(JSON 문자열)을 Flutter 앱에게 그대로 반환
-            return response;
+            // 6. 성공 응답 반환
+            return ResponseEntity.ok(results);
 
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("AI 서버 요청 중 오류 발생: " + e.getMessage());
+            // 7. 에러 처리
+            e.printStackTrace(); // 👈 서버 로그에 에러를 찍어보는 것이 좋습니다.
+            return ResponseEntity.status(500).body(null); // 👈 null 대신 에러 DTO를 보낼 수도 있습니다.
         }
     }
 }
