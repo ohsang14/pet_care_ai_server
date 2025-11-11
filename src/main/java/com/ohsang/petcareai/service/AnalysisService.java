@@ -3,8 +3,10 @@ package com.ohsang.petcareai.service;
 import com.ohsang.petcareai.domain.BreedInfo;
 import com.ohsang.petcareai.dto.AiResponseDto;
 import com.ohsang.petcareai.dto.AnalysisResponseDto;
+import com.ohsang.petcareai.dto.DogApiResponseDto;
 import com.ohsang.petcareai.repository.BreedInfoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -25,8 +27,12 @@ public class AnalysisService {
     private final RestTemplate restTemplate;
     private final BreedInfoRepository breedInfoRepository;
 
-    // Python AI 서버의 분석 URL
+    // application.properties에 저장한 API 키를 불러옵니다.
+    @Value("${dog.api.key}")
+    private String dogApiKey;
+
     private final String aiServerUrl = "http://localhost:5001/analyze";
+    private final String dogApiUrl = "https://api.thedogapi.com/v1/breeds/search?q=";
 
     /**
      * 이미지 분석의 모든 과정을 처리하는 메인 메소드
@@ -36,67 +42,85 @@ public class AnalysisService {
         // 1. Python AI 서버에 이미지 전송 및 '순수 AI 결과' 받기
         AiResponseDto[] aiResults = callAiServer(file);
 
-        // 2. 최종적으로 Flutter 앱에 보낼 '완성본 DTO 리스트' 생성
         List<AnalysisResponseDto> finalResponseList = new ArrayList<>();
 
-        // 3. AI 결과를 하나씩 순회하며, DB에서 '추가 정보'를 조회하고 '조합'
         if (aiResults != null) {
             for (AiResponseDto aiResult : aiResults) {
 
-                // 4. AI가 준 영어 이름(e.g., 'Maltese_dog')으로 MySQL DB 조회
+                String breedNameEn = aiResult.getBreed_name_en();
+
+                // 2. MySQL DB에서 '한국어 이름' 조회
                 Optional<BreedInfo> breedInfoOptional =
-                        breedInfoRepository.findByBreedNameEn(aiResult.getBreed_name_en());
+                        breedInfoRepository.findByBreedNameEn(breedNameEn);
+
+                // 3. The Dog API에서 '이미지/부가정보' 조회
+                String searchName = breedNameEn.replace('_', ' ');
+                DogApiResponseDto dogApiInfo = callTheDogApi(searchName);
 
                 AnalysisResponseDto finalDto;
                 if (breedInfoOptional.isPresent()) {
-                    // 5-A. DB에 정보가 있는 경우: (DB 정보 + AI 확률)로 조합
-                    BreedInfo breedInfo = breedInfoOptional.get();
-                    finalDto = new AnalysisResponseDto(breedInfo, aiResult);
+                    // 4-A. DB 정보 O: (AI 결과 + DB 정보 + Dog API 정보) 조합
+                    finalDto = new AnalysisResponseDto(aiResult, breedInfoOptional.get(), dogApiInfo);
                 } else {
-                    // 5-B. DB에 정보가 없는 경우: (AI 정보만)으로 조합 (Fallback)
-                    finalDto = new AnalysisResponseDto(aiResult);
+                    // 4-B. DB 정보 X: (AI 결과 + Dog API 정보) 조합 (Fallback)
+                    finalDto = new AnalysisResponseDto(aiResult, null, dogApiInfo);
                 }
                 finalResponseList.add(finalDto);
             }
         }
-
-        // 6. '최종 완성본' 리스트 반환
         return finalResponseList;
     }
 
     /**
-     * RestTemplate을 사용해 Python AI 서버를 호출하는 내부 함수
+     * Python AI 서버 호출
      */
     private AiResponseDto[] callAiServer(MultipartFile file) throws IOException {
-
-        // 1. Python 서버로 'multipart/form-data'를 보내기 위한 준비
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-
-        // 2. Flutter에서 받은 파일을 Python 서버로 보낼 수 있게 재포장
-        //    (파일 이름이 없으면 Python 서버가 파일을 인식하지 못할 수 있음)
         ByteArrayResource fileAsResource = new ByteArrayResource(file.getBytes()) {
             @Override
             public String getFilename() {
-                // 원본 파일 이름을 사용해야 Python Flask가 제대로 인식
                 return file.getOriginalFilename();
             }
         };
         body.add("file", fileAsResource);
 
-        // 3. RestTemplate으로 Python 서버에 POST 요청 (파일 첨부)
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
-        // 4. [중요] 응답을 String이 아닌 AiResponseDto '배열'([])로 받음
         ResponseEntity<AiResponseDto[]> response = restTemplate.postForEntity(
                 aiServerUrl,
                 requestEntity,
                 AiResponseDto[].class
         );
-
-        // 5. Python 서버가 보낸 '순수 AI 결과' (JSON 배열) 반환
         return response.getBody();
+    }
+
+    /**
+     * 'The Dog API'를 호출하는 새 함수
+     */
+    private DogApiResponseDto callTheDogApi(String breedName) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-api-key", dogApiKey);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<DogApiResponseDto[]> response = restTemplate.exchange(
+                    dogApiUrl + breedName, // e.g., .../search?q=Maltese dog
+                    HttpMethod.GET,
+                    entity,
+                    DogApiResponseDto[].class // 응답을 DogApiResponseDto '배열'로 받음
+            );
+
+            if (response.getBody() != null && response.getBody().length > 0) {
+                return response.getBody()[0]; // 첫 번째(가장 정확한) 결과만 사용
+            } else {
+                return null; // The Dog API에 검색 결과가 없는 경우
+            }
+        } catch (Exception e) {
+            System.out.println("The Dog API 호출 오류: " + e.getMessage());
+            return null; // 에러 발생 시
+        }
     }
 }

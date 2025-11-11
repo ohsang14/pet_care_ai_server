@@ -1,42 +1,57 @@
 package com.ohsang.petcareai.controller;
 
 import com.ohsang.petcareai.dto.AnalysisResponseDto;
-import com.ohsang.petcareai.service.AnalysisService; // 👈 1. RestTemplate 대신 Service를 import
+import com.ohsang.petcareai.service.AnalysisService;
+import com.ohsang.petcareai.service.CatAnalysisService; // 1. 고양이 서비스 import
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile; // 👈 2. MultipartFile import
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List; // 👈 3. List import
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/analysis")
 @RequiredArgsConstructor
 public class AnalysisController {
 
-    // 4. RestTemplate 대신 AnalysisService를 주입받음
-    private final AnalysisService analysisService;
+    // 2. 강아지 서비스 (기존 AnalysisService)
+    private final AnalysisService dogAnalysisService;
+
+    // 3. 고양이 서비스 (새로 만든 CatAnalysisService)
+    private final CatAnalysisService catAnalysisService;
 
     /**
-     * 실제 품종 분석 요청 API
-     * 이제 Controller는 '안내 데스크' 역할만 하고,
-     * 모든 복잡한 처리는 'analysisService'가 담당합니다.
+     * 강아지 품종 분석 API
      */
-    @PostMapping("/breed")
-    public ResponseEntity<List<AnalysisResponseDto>> analyzeBreed(
+    @PostMapping("/dog") // 4. 엔드포인트를 /breed 에서 /dog 로 변경
+    public ResponseEntity<List<AnalysisResponseDto>> analyzeDogBreed(
             @RequestParam("file") MultipartFile file) {
 
         try {
-            // 5. '작업반장'에게 이미지 파일을 넘기고, '최종 완성본' DTO 리스트를 받음
-            List<AnalysisResponseDto> results = analysisService.analyzeImage(file);
-
-            // 6. 성공 응답 반환
+            // 5. 강아지 서비스 호출
+            List<AnalysisResponseDto> results = dogAnalysisService.analyzeImage(file);
             return ResponseEntity.ok(results);
-
         } catch (Exception e) {
-            // 7. 에러 처리
-            e.printStackTrace(); // 👈 서버 로그에 에러를 찍어보는 것이 좋습니다.
-            return ResponseEntity.status(500).body(null); // 👈 null 대신 에러 DTO를 보낼 수도 있습니다.
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(null);
+        }
+    }
+
+    /**
+     * 고양이 품종 분석 API
+     */
+    @PostMapping("/cat") // 6. 고양이용 /cat 엔드포인트 신설
+    public ResponseEntity<List<AnalysisResponseDto>> analyzeCatBreed(
+            @RequestParam("file") MultipartFile file) {
+
+        try {
+            // 7. 고양이 서비스 호출
+            List<AnalysisResponseDto> results = catAnalysisService.analyzeImage(file);
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(null);
         }
     }
 }
