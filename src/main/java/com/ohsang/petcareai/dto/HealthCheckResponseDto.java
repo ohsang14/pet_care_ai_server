@@ -1,5 +1,6 @@
 package com.ohsang.petcareai.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty; // 👈 1. import 추가
 import com.ohsang.petcareai.domain.HealthCheck;
 import lombok.Getter;
 
@@ -8,18 +9,31 @@ import java.time.LocalDateTime;
 @Getter
 public class HealthCheckResponseDto {
 
+    @JsonProperty("id")
     private Long id;
+
+    @JsonProperty("checkDate")
     private LocalDateTime checkDate;
+
+    @JsonProperty("totalScore")
     private int totalScore;
 
-    // 5단계 답변 텍스트
+    @JsonProperty("answerStep1Appetite")
     private String answerStep1Appetite;
+
+    @JsonProperty("answerStep2Activity")
     private String answerStep2Activity;
+
+    @JsonProperty("answerStep3Digestive")
     private String answerStep3Digestive;
+
+    @JsonProperty("answerStep4Urinary")
     private String answerStep4Urinary;
+
+    @JsonProperty("answerStep5Skin")
     private String answerStep5Skin;
 
-    // 엔티티를 DTO로 변환하는 생성자
+    // 엔티티를 DTO로 변환하는 생성자 (수정 없음)
     public HealthCheckResponseDto(HealthCheck healthCheck) {
         this.id = healthCheck.getId();
         this.checkDate = healthCheck.getCheckDate();

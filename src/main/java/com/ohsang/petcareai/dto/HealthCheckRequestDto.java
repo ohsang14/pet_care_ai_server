@@ -1,5 +1,6 @@
 package com.ohsang.petcareai.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty; // 👈 1. import 추가
 import com.ohsang.petcareai.domain.Dog;
 import com.ohsang.petcareai.domain.HealthCheck;
 import lombok.Getter;
@@ -9,17 +10,25 @@ import lombok.Setter;
 @Setter
 public class HealthCheckRequestDto {
 
-    // Flutter가 계산한 최종 점수
+    @JsonProperty("totalScore") // 👈 2. JSON 키 매핑
     private int totalScore;
 
-    // Flutter가 보내는 5단계 답변 텍스트
+    @JsonProperty("answerStep1Appetite") // 👈 3. JSON 키 매핑
     private String answerStep1Appetite;
+
+    @JsonProperty("answerStep2Activity") // 👈 4. JSON 키 매핑
     private String answerStep2Activity;
+
+    @JsonProperty("answerStep3Digestive") // 👈 5. JSON 키 매핑
     private String answerStep3Digestive;
+
+    @JsonProperty("answerStep4Urinary") // 👈 6. JSON 키 매핑
     private String answerStep4Urinary;
+
+    @JsonProperty("answerStep5Skin") // 👈 7. JSON 키 매핑
     private String answerStep5Skin;
 
-    // 이 DTO를 엔티티로 변환하는 헬퍼 메서드
+    // DTO를 엔티티로 변환하는 헬퍼 메서드 (수정 없음)
     public HealthCheck toEntity(Dog dog) {
         HealthCheck healthCheck = new HealthCheck();
         healthCheck.setDog(dog);
@@ -29,7 +38,6 @@ public class HealthCheckRequestDto {
         healthCheck.setAnswerStep3Digestive(this.answerStep3Digestive);
         healthCheck.setAnswerStep4Urinary(this.answerStep4Urinary);
         healthCheck.setAnswerStep5Skin(this.answerStep5Skin);
-        // (참고: checkDate는 @PrePersist에 의해 자동 생성됨)
         return healthCheck;
     }
 }

@@ -24,29 +24,27 @@ public class HealthCheck {
     @Column(nullable = false)
     private int totalScore;
 
-    // 5단계 질문 답변을 저장할 컬럼들
-    @Column(nullable = false)
+    // ⭐️ [수정] Java 필드(camelCase)와 DB 컬럼(snake_case)을 1:1 매핑
+    @Column(name = "answer_step1_appetite", nullable = false)
     private String answerStep1Appetite;
 
-    @Column(nullable = false)
+    @Column(name = "answer_step2_activity", nullable = false)
     private String answerStep2Activity;
 
-    @Column(nullable = false)
+    @Column(name = "answer_step3_digestive", nullable = false)
     private String answerStep3Digestive;
 
-    @Column(nullable = false)
+    @Column(name = "answer_step4_urinary", nullable = false)
     private String answerStep4Urinary;
 
-    @Column(nullable = false)
+    @Column(name = "answer_step5_skin", nullable = false)
     private String answerStep5Skin;
 
-    // HealthCheck는 Dog에 속합니다 (ManyToOne)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dog_id", nullable = false)
-    @JsonIgnore // API 응답 시 Dog 객체는 제외 (무한 순환 방지)
+    @JsonIgnore
     private Dog dog;
 
-    // 저장 전 날짜 자동 입력
     @PrePersist
     public void prePersist() {
         this.checkDate = LocalDateTime.now();
