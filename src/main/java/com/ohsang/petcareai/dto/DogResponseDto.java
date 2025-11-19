@@ -1,5 +1,6 @@
 package com.ohsang.petcareai.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ohsang.petcareai.domain.Dog;
 import java.time.LocalDate;
 import lombok.Getter;
@@ -9,7 +10,13 @@ public class DogResponseDto {
 
     private Long id;
     private String name;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate birthDate;
+    private String profileImageUrl;
+    private String breed;
+    private String gender;
+    private Boolean isNeutered;
+    private Double weight;
     // member 정보는 제외하여 비밀번호 노출을 원천 차단
 
     // Dog(Entity)를 DogResponseDto(DTO)로 변환하는 생성자
@@ -17,5 +24,10 @@ public class DogResponseDto {
         this.id = dog.getId();
         this.name = dog.getName();
         this.birthDate = dog.getBirthDate();
+        this.profileImageUrl = dog.getProfileImageUrl();
+        this.breed = dog.getBreed();
+        this.gender = dog.getGender();
+        this.isNeutered = dog.getIsNeutered();
+        this.weight = dog.getWeight();
     }
 }

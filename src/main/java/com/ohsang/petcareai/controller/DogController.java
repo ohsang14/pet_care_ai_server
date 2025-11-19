@@ -66,4 +66,63 @@ public class DogController {
         // 3. DTO 리스트를 클라이언트에게 반환합니다.
         return ResponseEntity.ok(dogDtos);
     }
+
+    @DeleteMapping("/dogs/{dogId}")
+    public ResponseEntity<Void> deleteDog(@PathVariable Long dogId) {
+
+        // 1. 삭제할 반려견이 존재하는지 확인
+        if (!dogRepository.existsById(dogId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        try {
+            // 2. ID를 기준으로 반려견 삭제
+            dogRepository.deleteById(dogId);
+
+            // 3. 성공 시 200 OK 또는 204 No Content 반환
+            return ResponseEntity.ok().build();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PutMapping("/dogs/{dogId}")
+    public ResponseEntity<DogResponseDto> updateDog(
+            @PathVariable Long dogId,
+            @RequestBody Dog updatedDogData) { // 1. Flutter에서 보낸 수정된 정보
+
+        // 2. 수정할 반려견이 DB에 존재하는지 확인
+        Optional<Dog> optionalDog = dogRepository.findById(dogId);
+        if (optionalDog.isEmpty()) {
+            // 존재하지 않는 dogId이면 404 Not Found 반환
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        Dog existingDog = optionalDog.get();
+
+        // 3. DTO(updatedDogData)의 정보로 existingDog 엔티티의 필드를 덮어쓰기
+        existingDog.setName(updatedDogData.getName());
+        existingDog.setBirthDate(updatedDogData.getBirthDate());
+        existingDog.setProfileImageUrl(updatedDogData.getProfileImageUrl());
+        existingDog.setBreed(updatedDogData.getBreed());
+        existingDog.setGender(updatedDogData.getGender());
+        existingDog.setIsNeutered(updatedDogData.getIsNeutered());
+        existingDog.setWeight(updatedDogData.getWeight());
+
+
+        try {
+            // 4. DB에 저장 (JPA가 변경된 내용을 감지하고 update 쿼리 실행)
+            Dog savedDog = dogRepository.save(existingDog);
+
+            // 5. 수정된 결과를 DTO로 변환하여 200 OK와 함께 반환
+            return ResponseEntity.ok(new DogResponseDto(savedDog));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            // 저장 중 에러 발생 시 500 Internal Server Error 반환
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }
