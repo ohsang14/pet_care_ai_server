@@ -69,4 +69,5 @@ public class HealthCheckController {
         // 7. 저장된 객체를 응답 DTO로 변환하여 반환
         return ResponseEntity.status(HttpStatus.CREATED).body(new HealthCheckResponseDto(savedCheck));
     }
+
 }
