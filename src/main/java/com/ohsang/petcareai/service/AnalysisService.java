@@ -3,6 +3,7 @@ package com.ohsang.petcareai.service;
 import com.ohsang.petcareai.domain.BreedInfo;
 import com.ohsang.petcareai.dto.AiResponseDto;
 import com.ohsang.petcareai.dto.AnalysisResponseDto;
+import com.ohsang.petcareai.dto.DogApiImageDto; // 👈 추가
 import com.ohsang.petcareai.dto.DogApiResponseDto;
 import com.ohsang.petcareai.repository.BreedInfoRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,42 +28,37 @@ public class AnalysisService {
     private final RestTemplate restTemplate;
     private final BreedInfoRepository breedInfoRepository;
 
-    // application.properties에 저장한 API 키를 불러옵니다.
     @Value("${dog.api.key}")
     private String dogApiKey;
 
     private final String aiServerUrl = "http://localhost:5001/analyze";
     private final String dogApiUrl = "https://api.thedogapi.com/v1/breeds/search?q=";
+    // 👇 [추가] 이미지 상세 조회용 URL
+    private final String dogApiImageUrl = "https://api.thedogapi.com/v1/images/";
 
-    /**
-     * 이미지 분석의 모든 과정을 처리하는 메인 메소드
-     */
     public List<AnalysisResponseDto> analyzeImage(MultipartFile file) throws IOException {
-
-        // 1. Python AI 서버에 이미지 전송 및 '순수 AI 결과' 받기
         AiResponseDto[] aiResults = callAiServer(file);
-
         List<AnalysisResponseDto> finalResponseList = new ArrayList<>();
 
         if (aiResults != null) {
             for (AiResponseDto aiResult : aiResults) {
-
                 String breedNameEn = aiResult.getBreed_name_en();
+                Optional<BreedInfo> breedInfoOptional = breedInfoRepository.findByBreedNameEn(breedNameEn);
 
-                // 2. MySQL DB에서 '한국어 이름' 조회
-                Optional<BreedInfo> breedInfoOptional =
-                        breedInfoRepository.findByBreedNameEn(breedNameEn);
-
-                // 3. The Dog API에서 '이미지/부가정보' 조회
                 String searchName = breedNameEn.replace('_', ' ');
+                BreedInfo breedInfo = breedInfoOptional.orElse(null);
+
+                if (breedInfo != null && breedInfo.getApiSearchTerm() != null) {
+                    searchName = breedInfo.getApiSearchTerm();
+                }
+
+                // API 호출
                 DogApiResponseDto dogApiInfo = callTheDogApi(searchName);
 
                 AnalysisResponseDto finalDto;
-                if (breedInfoOptional.isPresent()) {
-                    // 4-A. DB 정보 O: (AI 결과 + DB 정보 + Dog API 정보) 조합
-                    finalDto = new AnalysisResponseDto(aiResult, breedInfoOptional.get(), dogApiInfo);
+                if (breedInfo != null) {
+                    finalDto = new AnalysisResponseDto(aiResult, breedInfo, dogApiInfo);
                 } else {
-                    // 4-B. DB 정보 X: (AI 결과 + Dog API 정보) 조합 (Fallback)
                     finalDto = new AnalysisResponseDto(aiResult, null, dogApiInfo);
                 }
                 finalResponseList.add(finalDto);
@@ -71,34 +67,27 @@ public class AnalysisService {
         return finalResponseList;
     }
 
-    /**
-     * Python AI 서버 호출
-     */
     private AiResponseDto[] callAiServer(MultipartFile file) throws IOException {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         ByteArrayResource fileAsResource = new ByteArrayResource(file.getBytes()) {
             @Override
-            public String getFilename() {
-                return file.getOriginalFilename();
-            }
+            public String getFilename() { return file.getOriginalFilename(); }
         };
         body.add("file", fileAsResource);
-
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
-        ResponseEntity<AiResponseDto[]> response = restTemplate.postForEntity(
-                aiServerUrl,
-                requestEntity,
-                AiResponseDto[].class
-        );
-        return response.getBody();
+        try {
+            ResponseEntity<AiResponseDto[]> response = restTemplate.postForEntity(aiServerUrl, requestEntity, AiResponseDto[].class);
+            return response.getBody();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     /**
-     * 'The Dog API'를 호출하는 새 함수
+     * The Dog API 호출 (업그레이드됨)
      */
     private DogApiResponseDto callTheDogApi(String breedName) {
         HttpHeaders headers = new HttpHeaders();
@@ -107,20 +96,54 @@ public class AnalysisService {
 
         try {
             ResponseEntity<DogApiResponseDto[]> response = restTemplate.exchange(
-                    dogApiUrl + breedName, // e.g., .../search?q=Maltese dog
+                    dogApiUrl + breedName,
                     HttpMethod.GET,
                     entity,
-                    DogApiResponseDto[].class // 응답을 DogApiResponseDto '배열'로 받음
+                    DogApiResponseDto[].class
             );
 
             if (response.getBody() != null && response.getBody().length > 0) {
-                return response.getBody()[0]; // 첫 번째(가장 정확한) 결과만 사용
+                DogApiResponseDto result = response.getBody()[0];
+
+                // ⭐️ [핵심 수정] 이미지가 없고 참조 ID만 있다면? -> 이미지 API 재호출!
+                if (result.getImage() == null && result.getReferenceImageId() != null) {
+                    String imageUrl = callTheDogImageApi(result.getReferenceImageId());
+                    if (imageUrl != null) {
+                        // 가짜 ImageDto를 만들어서 넣어줍니다.
+                        DogApiImageDto imageDto = new DogApiImageDto();
+                        imageDto.setUrl(imageUrl);
+                        result.setImage(imageDto);
+                    }
+                }
+                return result;
             } else {
-                return null; // The Dog API에 검색 결과가 없는 경우
+                return null;
             }
         } catch (Exception e) {
             System.out.println("The Dog API 호출 오류: " + e.getMessage());
-            return null; // 에러 발생 시
+            return null;
         }
+    }
+
+    // 👇 [추가] 이미지 ID로 실제 URL을 가져오는 메서드
+    private String callTheDogImageApi(String imageId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-api-key", dogApiKey);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<DogApiImageDto> response = restTemplate.exchange(
+                    dogApiImageUrl + imageId,
+                    HttpMethod.GET,
+                    entity,
+                    DogApiImageDto.class
+            );
+            if (response.getBody() != null) {
+                return response.getBody().getUrl();
+            }
+        } catch (Exception e) {
+            System.out.println("The Dog Image API 오류: " + e.getMessage());
+        }
+        return null;
     }
 }

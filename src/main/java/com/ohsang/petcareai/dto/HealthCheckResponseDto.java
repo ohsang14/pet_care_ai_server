@@ -19,8 +19,14 @@ public class HealthCheckResponseDto {
     @JsonProperty("totalScore")
     private int totalScore;
 
+    @JsonProperty("dogProfileImageUrl")
+    private String dogProfileImageUrl;
+
     @JsonProperty("answerStep1Appetite")
     private String answerStep1Appetite;
+
+    @JsonProperty("dogName")
+    private String dogName;
 
     @JsonProperty("answerStep2Activity")
     private String answerStep2Activity;
@@ -34,8 +40,6 @@ public class HealthCheckResponseDto {
     @JsonProperty("answerStep5Skin")
     private String answerStep5Skin;
 
-    private String dogName;
-    private String dogProfileImageUrl;
 
     // 엔티티를 DTO로 변환하는 생성자 (수정 없음)
     public HealthCheckResponseDto(HealthCheck healthCheck) {
@@ -47,7 +51,9 @@ public class HealthCheckResponseDto {
         this.answerStep3Digestive = healthCheck.getAnswerStep3Digestive();
         this.answerStep4Urinary = healthCheck.getAnswerStep4Urinary();
         this.answerStep5Skin = healthCheck.getAnswerStep5Skin();
-        this.dogName = healthCheck.getDog().getName();
-        this.dogProfileImageUrl = healthCheck.getDog().getProfileImageUrl();
+        if (healthCheck.getDog() != null) {
+            this.dogProfileImageUrl = healthCheck.getDog().getProfileImageUrl();
+            this.dogName = healthCheck.getDog().getName();
+        }
     }
 }

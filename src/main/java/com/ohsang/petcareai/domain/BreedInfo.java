@@ -19,4 +19,7 @@ public class BreedInfo {
 
     @Column(name = "breed_name_ko", nullable = false)
     private String breedNameKo;
+
+    @Column(name = "api_search_term")
+    private String apiSearchTerm;
 }

@@ -16,5 +16,8 @@ public class DogApiResponseDto {
     @JsonProperty("life_span")
     private String lifeSpan;
 
-    private String temperament; // 👈 품종 성격
+    private String temperament;
+
+    @JsonProperty("reference_image_id")
+    private String referenceImageId;
 }
