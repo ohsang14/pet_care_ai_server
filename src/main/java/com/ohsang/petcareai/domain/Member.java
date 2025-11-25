@@ -22,6 +22,9 @@ public class Member {
     @Column(nullable = false)
     private String password;
 
+    @Column(name ="kakao_id", unique = true)
+    private Long kakaoId;
+
     private String profileImageUrl;
     private String phoneNumber;
     private String address;
