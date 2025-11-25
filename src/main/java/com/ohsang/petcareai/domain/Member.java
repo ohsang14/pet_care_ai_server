@@ -21,4 +21,8 @@ public class Member {
 
     @Column(nullable = false)
     private String password;
+
+    private String profileImageUrl;
+    private String phoneNumber;
+    private String address;
 }

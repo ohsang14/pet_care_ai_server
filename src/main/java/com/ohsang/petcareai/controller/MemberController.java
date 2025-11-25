@@ -47,6 +47,10 @@ public class MemberController {
                 .map(member -> {
                     if (updateData.getName() != null) member.setName(updateData.getName());
                     if (updateData.getPassword() != null) member.setPassword(updateData.getPassword());
+                    if (updateData.getProfileImageUrl() != null) member.setProfileImageUrl(updateData.getProfileImageUrl());
+                    if (updateData.getPhoneNumber() != null) member.setPhoneNumber(updateData.getPhoneNumber());
+                    if (updateData.getAddress() != null) member.setAddress(updateData.getAddress());
+
                     Member saved = memberRepository.save(member);
                     return ResponseEntity.ok(saved);
                 })
