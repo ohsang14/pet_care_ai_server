@@ -112,11 +112,12 @@ public class MemberController {
      */
     @DeleteMapping("/{memberId}")
     public ResponseEntity<Void> deleteMember(@PathVariable Long memberId) {
-        if (!memberRepository.existsById(memberId)) {
+        Member member = memberRepository.findById(memberId).orElse(null);
+        if (member == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
         try {
-            memberRepository.deleteById(memberId);
+            memberRepository.delete(member);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             e.printStackTrace();

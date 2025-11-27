@@ -1,8 +1,12 @@
 package com.ohsang.petcareai.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -28,4 +32,9 @@ public class Member {
     private String profileImageUrl;
     private String phoneNumber;
     private String address;
+
+
+    @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore // 무한루프 방지
+    private List<Dog> dogs = new ArrayList<>();
 }
